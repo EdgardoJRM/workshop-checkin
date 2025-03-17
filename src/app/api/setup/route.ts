@@ -1,44 +1,45 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
+import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { email, password } = body;
+    // Verificar si ya existe un usuario administrador
+    const users = await db.user.findMany();
+    const adminExists = users.some(user => user.role === 'admin');
 
-    // Verificar si ya existe un admin
-    const existingAdmin = await prisma.user.findFirst({
-      where: { role: 'admin' }
-    });
-
-    if (existingAdmin) {
+    if (adminExists) {
       return NextResponse.json(
         { error: 'Ya existe un usuario administrador' },
         { status: 400 }
       );
     }
 
-    // Crear usuario admin
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const admin = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name: 'Administrador',
-        role: 'admin',
-        isActive: true
-      }
+    // Crear usuario administrador
+    const hashedPassword = await bcrypt.hash('admin123', 10);
+    const adminUser = await db.user.create({
+      id: Date.now().toString(),
+      email: 'admin@example.com',
+      password: hashedPassword,
+      name: 'Admin',
+      role: 'admin',
+      perks: [],
+      eventAccess: [],
+      isActive: true,
+      type: 'user'
     });
 
+    // Eliminar el password del objeto de respuesta
+    const { password: _, ...userWithoutPassword } = adminUser;
+
     return NextResponse.json({
-      message: 'Usuario administrador creado exitosamente',
-      email: admin.email
+      message: 'Configuración inicial completada',
+      user: userWithoutPassword
     });
   } catch (error) {
-    console.error('Error en setup:', error);
+    console.error('Error en configuración inicial:', error);
     return NextResponse.json(
-      { error: 'Error al crear usuario administrador' },
+      { error: 'Error al realizar la configuración inicial' },
       { status: 500 }
     );
   }

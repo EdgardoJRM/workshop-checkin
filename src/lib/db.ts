@@ -65,13 +65,16 @@ export interface User {
   perks?: string[];
   eventAccess?: string[];
   isActive?: boolean;
-  type?: 'user' | 'event' | 'perk';
+  type?: 'user' | 'event' | 'perk' | 'access_log';
   date?: string;
   location?: string;
   capacity?: number | null;
   description?: string;
   price?: number;
   contents?: any[];
+  userId?: string;
+  eventId?: string;
+  eventName?: string;
   createdAt: Date;
   updatedAt?: Date;
 }

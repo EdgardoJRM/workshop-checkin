@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import { v4 as uuidv4 } from 'uuid';
-import bcrypt from 'bcryptjs';
-import { prisma } from '@/lib/db';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { db } from '@/lib/db';
+import bcrypt from 'bcryptjs';
 
 // Función auxiliar para validar email
 function validateEmail(email: string): boolean {
@@ -13,33 +12,32 @@ function validateEmail(email: string): boolean {
 
 export async function POST(request: Request) {
   try {
-    // Verificar que el usuario está autenticado y es admin
     const session = await getServerSession(authOptions);
-    if (!session?.user || session.user.role !== 'admin') {
+    if (!session?.user?.role || session.user.role !== 'admin') {
       return NextResponse.json(
         { error: 'No autorizado' },
         { status: 403 }
       );
     }
 
-    const body = await request.json();
-    const { name, email, password, role = 'user', isActive = true } = body;
+    const { email, password, name, role = 'user' } = await request.json();
 
-    // Verificar datos obligatorios
-    if (!name || !email || !password) {
+    // Validar datos requeridos
+    if (!email || !password || !name) {
       return NextResponse.json(
-        { error: 'Todos los campos son obligatorios' },
+        { error: 'Todos los campos son requeridos' },
         { status: 400 }
       );
     }
 
-    // Verificar si el email ya existe
-    const existingUser = await prisma.user.findUnique({
+    // Verificar si el usuario ya existe
+    const existingUser = await db.user.findUnique({
       where: { email }
     });
+
     if (existingUser) {
       return NextResponse.json(
-        { error: 'Email ya registrado' },
+        { error: 'El email ya está registrado' },
         { status: 400 }
       );
     }
@@ -68,36 +66,30 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generar hash de la contraseña
+    // Hash de la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Crear usuario
-    const newUser = await prisma.user.create({
-      data: {
-        id: uuidv4(),
-        name,
-        email,
-        password: hashedPassword,
-        role,
-        isActive,
-      }
+    const user = await db.user.create({
+      id: Date.now().toString(),
+      email,
+      password: hashedPassword,
+      name,
+      role,
+      perks: [],
+      eventAccess: [],
+      isActive: true,
+      type: 'user'
     });
 
-    // Retornar respuesta exitosa
-    return NextResponse.json({
-      message: 'Usuario registrado exitosamente',
-      user: {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
-        isActive: newUser.isActive,
-      },
-    });
+    // Eliminar el password del objeto de respuesta
+    const { password: _, ...userWithoutPassword } = user;
+
+    return NextResponse.json(userWithoutPassword);
   } catch (error) {
-    console.error('Error en registro de usuario:', error);
+    console.error('Error al registrar usuario:', error);
     return NextResponse.json(
-      { error: 'Error al procesar la solicitud' },
+      { error: 'Error al registrar el usuario' },
       { status: 500 }
     );
   }

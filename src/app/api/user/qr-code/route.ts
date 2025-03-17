@@ -1,39 +1,22 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { db } from '@/lib/db';
 import QRCode from 'qrcode';
-import { prisma } from '@/lib/db';
 
 export async function GET() {
   try {
-    // Verificar sesión
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    if (!session?.user) {
       return NextResponse.json(
         { error: 'No autorizado' },
-        { status: 401 }
+        { status: 403 }
       );
     }
 
-    // Obtener el usuario con sus perks y accesos a eventos
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        isActive: true,
-        perks: {
-          select: {
-            perk: {
-              select: {
-                name: true
-              }
-            }
-          }
-        }
-      }
+    // Obtener usuario usando DynamoDB
+    const user = await db.user.findUnique({
+      where: { id: session.user.id }
     });
 
     if (!user) {
@@ -43,32 +26,23 @@ export async function GET() {
       );
     }
 
-    // Crear objeto con la información que queremos en el QR
+    // Generar datos para el código QR
     const qrData = {
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role,
-      perks: user.perks.map(p => p.perk.name),
-      timestamp: new Date().toISOString()
+      perks: user.perks,
+      eventAccess: user.eventAccess
     };
 
-    // Generar QR code como data URL
-    const qrCode = await QRCode.toDataURL(JSON.stringify(qrData), {
-      type: 'image/png',
-      margin: 1,
-      width: 512,
-      color: {
-        dark: '#000000',
-        light: '#ffffff'
-      }
-    });
+    // Generar código QR
+    const qrCode = await QRCode.toDataURL(JSON.stringify(qrData));
 
     return NextResponse.json({ qrCode });
   } catch (error) {
-    console.error('Error al generar QR:', error);
+    console.error('Error al generar código QR:', error);
     return NextResponse.json(
-      { error: 'Error al generar el código QR' },
+      { error: 'Error al generar código QR' },
       { status: 500 }
     );
   }
