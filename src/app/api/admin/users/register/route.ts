@@ -83,9 +83,18 @@ export async function POST(request: Request) {
     });
 
     // Eliminar el password del objeto de respuesta
-    const { password: _, ...userWithoutPassword } = user;
+    const userResponse = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      perks: user.perks,
+      eventAccess: user.eventAccess,
+      isActive: user.isActive,
+      type: user.type
+    };
 
-    return NextResponse.json(userWithoutPassword);
+    return NextResponse.json(userResponse);
   } catch (error) {
     console.error('Error al registrar usuario:', error);
     return NextResponse.json(

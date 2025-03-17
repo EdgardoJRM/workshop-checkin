@@ -39,22 +39,41 @@ const perks = [
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.role || session.user.role !== 'admin') {
+    if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json(
-        { error: 'No autorizado' },
+        { error: 'Unauthorized' },
         { status: 403 }
       );
     }
 
-    // Obtener perks usando DynamoDB
-    const allItems = await db.user.findMany();
-    const perks = allItems.filter(item => item.type === 'perk');
+    const perks = await db.perk.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
 
-    return NextResponse.json(perks);
+    // Get user counts for each perk
+    const perksWithCounts = await Promise.all(
+      perks.map(async (perk) => {
+        const users = await db.user.findMany();
+        const userCount = users.filter(user => 
+          user.perks?.includes(perk.id)
+        ).length;
+
+        return {
+          ...perk,
+          _count: {
+            users: userCount
+          }
+        };
+      })
+    );
+
+    return NextResponse.json(perksWithCounts);
   } catch (error) {
-    console.error('Error al obtener perks:', error);
+    console.error('Error fetching perks:', error);
     return NextResponse.json(
-      { error: 'Error al obtener perks' },
+      { error: 'Error al cargar perks' },
       { status: 500 }
     );
   }
@@ -64,99 +83,120 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.role || session.user.role !== 'admin') {
+    if (!session?.user || session.user.role !== 'admin') {
       return NextResponse.json(
-        { error: 'No autorizado' },
+        { error: 'Unauthorized' },
         { status: 403 }
       );
     }
 
-    const body = await request.json();
-    const { name, description, type, price } = body;
+    const data = await request.json();
+    const { name, description, type, price } = data;
 
-    // Validar datos requeridos
-    if (!name || !type || price === undefined) {
-      return NextResponse.json(
-        { error: 'Nombre, tipo y precio son requeridos' },
-        { status: 400 }
-      );
-    }
-
-    // Crear perk usando DynamoDB
-    const perk = await db.user.create({
-      id: Date.now().toString(),
+    const perk = await db.perk.create({
       name,
       description,
       type,
       price,
-      contents: [],
-      type: 'perk'
+      contents: []
     });
 
-    return NextResponse.json(perk);
+    return NextResponse.json({
+      ...perk,
+      _count: { users: 0 }
+    });
   } catch (error) {
-    console.error('Error al crear perk:', error);
+    console.error('Error creating perk:', error);
     return NextResponse.json(
-      { error: 'Error al crear el perk' },
+      { error: 'Error al crear perk' },
       { status: 500 }
     );
   }
 }
 
-// PUT /api/admin/perks - Actualizar un perk
-export async function PUT(request: Request) {
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user || session.user.role !== 'admin') {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
+// PUT /api/admin/perks/[id] - Actualizar un perk
+export async function PUT(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const data = await request.json();
-    const perkIndex = perks.findIndex(p => p.id === data.id);
-    
-    if (perkIndex === -1) {
-      return new NextResponse('Perk not found', { status: 404 });
+    const session = await getServerSession(authOptions);
+    if (!session?.user || session.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 403 }
+      );
     }
 
-    perks[perkIndex] = {
-      ...perks[perkIndex],
-      name: data.name,
-      description: data.description,
-      type: data.type
-    };
+    const data = await request.json();
+    const { name, description, type, price } = data;
 
-    return NextResponse.json(perks[perkIndex]);
+    const perk = await db.perk.update({
+      where: { id: params.id },
+      data: {
+        name,
+        description,
+        type,
+        price
+      }
+    });
+
+    if (!perk) {
+      return NextResponse.json(
+        { error: 'Perk no encontrado' },
+        { status: 404 }
+      );
+    }
+
+    const users = await db.user.findMany();
+    const userCount = users.filter(user => 
+      user.perks?.includes(perk.id)
+    ).length;
+
+    return NextResponse.json({
+      ...perk,
+      _count: { users: userCount }
+    });
   } catch (error) {
-    return new NextResponse('Error updating perk', { status: 500 });
+    console.error('Error updating perk:', error);
+    return NextResponse.json(
+      { error: 'Error al actualizar perk' },
+      { status: 500 }
+    );
   }
 }
 
-// DELETE /api/admin/perks - Eliminar un perk
-export async function DELETE(request: Request) {
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user || session.user.role !== 'admin') {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
+// DELETE /api/admin/perks/[id] - Eliminar un perk
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-
-    if (!id) {
-      return new NextResponse('Missing perk ID', { status: 400 });
+    const session = await getServerSession(authOptions);
+    if (!session?.user || session.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 403 }
+      );
     }
 
-    const perkIndex = perks.findIndex(p => p.id === id);
-    
-    if (perkIndex === -1) {
-      return new NextResponse('Perk not found', { status: 404 });
+    const perk = await db.perk.delete({
+      where: { id: params.id }
+    });
+
+    if (!perk) {
+      return NextResponse.json(
+        { error: 'Perk no encontrado' },
+        { status: 404 }
+      );
     }
 
-    perks.splice(perkIndex, 1);
-    return new NextResponse(null, { status: 204 });
+    return NextResponse.json({ message: 'Perk eliminado correctamente' });
   } catch (error) {
-    return new NextResponse('Error deleting perk', { status: 500 });
+    console.error('Error deleting perk:', error);
+    return NextResponse.json(
+      { error: 'Error al eliminar perk' },
+      { status: 500 }
+    );
   }
 } 

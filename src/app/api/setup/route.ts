@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 
-export async function POST(request: Request) {
+export async function POST() {
   try {
     // Verificar si ya existe un usuario administrador
     const users = await db.user.findMany();
@@ -30,11 +30,20 @@ export async function POST(request: Request) {
     });
 
     // Eliminar el password del objeto de respuesta
-    const { password: _, ...userWithoutPassword } = adminUser;
+    const userResponse = {
+      id: adminUser.id,
+      email: adminUser.email,
+      name: adminUser.name,
+      role: adminUser.role,
+      perks: adminUser.perks,
+      eventAccess: adminUser.eventAccess,
+      isActive: adminUser.isActive,
+      type: adminUser.type
+    };
 
     return NextResponse.json({
       message: 'Configuración inicial completada',
-      user: userWithoutPassword
+      user: userResponse
     });
   } catch (error) {
     console.error('Error en configuración inicial:', error);

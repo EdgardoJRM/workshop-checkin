@@ -18,7 +18,7 @@ interface Event {
   description: string;
   date: string;
   location: string;
-  capacity: number;
+  capacity: number | null;
   _count?: {
     attendees: number;
   };
@@ -62,14 +62,14 @@ export default function EventsPage() {
     }
   }, [session]);
 
-  const handleCreateEvent = async (data: Omit<Event, 'id'>) => {
+  const handleCreateEvent = async (event: Event) => {
     try {
       const response = await fetch('/api/admin/events', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(event),
       });
 
       if (!response.ok) {
@@ -84,14 +84,14 @@ export default function EventsPage() {
     }
   };
 
-  const handleEditEvent = async (data: Event) => {
+  const handleEditEvent = async (event: Event) => {
     try {
-      const response = await fetch(`/api/admin/events/${data.id}`, {
+      const response = await fetch(`/api/admin/events/${event.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(event),
       });
 
       if (!response.ok) {
@@ -226,7 +226,7 @@ export default function EventsPage() {
                   <Users className="h-5 w-5" />
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className="text-sm">
-                      {event._count?.attendees || 0} / {event.capacity}
+                      {event._count?.attendees || 0} / {event.capacity || 'N/A'}
                     </Badge>
                     <span className="text-sm">asistentes</span>
                   </div>
@@ -279,7 +279,7 @@ export default function EventsPage() {
       >
         {selectedEvent && (
           <EventForm
-            event={selectedEvent}
+            initialEvent={selectedEvent}
             onSubmit={handleEditEvent}
             onCancel={() => setSelectedEvent(null)}
           />

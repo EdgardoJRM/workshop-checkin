@@ -1,63 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import Modal from '@/components/shared/Modal';
-import PerkForm from '@/components/admin/PerkForm';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Plus } from 'lucide-react';
-
-interface Perk {
-  id: string;
-  name: string;
-  description: string;
-  type: string;
-  _count: {
-    users: number;
-  };
-}
-
-// Sample perks (in a real implementation, these would come from an API)
-const samplePerks: Perk[] = [
-  {
-    id: 'material-digital',
-    name: 'Material Digital',
-    description: 'Acceso a todos los materiales en formato digital',
-    type: 'digital',
-    _count: {
-      users: 56,
-    },
-  },
-  {
-    id: 'material-impreso',
-    name: 'Material Impreso',
-    description: 'Acceso a todos los materiales impresos',
-    type: 'impreso',
-    _count: {
-      users: 23,
-    },
-  },
-  {
-    id: 'videos-extra',
-    name: 'Videos Extra',
-    description: 'Acceso a videos adicionales del taller',
-    type: 'access',
-    _count: {
-      users: 14,
-    },
-  },
-  {
-    id: 'certificado',
-    name: 'Certificado',
-    description: 'Certificado de participación en el taller',
-    type: 'certificate',
-    _count: {
-      users: 42,
-    },
-  },
-];
+import { Button } from '@/components/ui/button';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
+import PerkForm from '@/components/admin/PerkForm';
+import type { Perk } from '@/lib/db';
 
 export default function PerksPage() {
   const { data: session, status } = useSession();
@@ -65,18 +15,15 @@ export default function PerksPage() {
   const [perks, setPerks] = useState<Perk[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [selectedPerk, setSelectedPerk] = useState<Perk | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editingPerk, setEditingPerk] = useState<Perk | null>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
-    } else if (status === 'authenticated' && session.user.role !== 'admin') {
-      router.push('/dashboard');
+      return;
     }
-  }, [status, router, session]);
 
-  useEffect(() => {
     const fetchPerks = async () => {
       try {
         const response = await fetch('/api/admin/perks');
@@ -92,59 +39,36 @@ export default function PerksPage() {
       }
     };
 
-    if (session?.user.role === 'admin') {
+    if (session?.user) {
       fetchPerks();
     }
-  }, [session]);
+  }, [session, status, router]);
 
-  const handleCreatePerk = async (data: Omit<Perk, 'id'>) => {
+  const handleSubmit = async (perk: Perk) => {
     try {
       const response = await fetch('/api/admin/perks', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(perk),
       });
 
       if (!response.ok) {
-        throw new Error('Error al crear el perk');
+        throw new Error('Error al crear perk');
       }
 
       const newPerk = await response.json();
-      setPerks([...perks, newPerk]);
-      setShowCreateForm(false);
+      setPerks([newPerk, ...perks]);
+      setShowForm(false);
+      setEditingPerk(null);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Error desconocido');
     }
   };
 
-  const handleEditPerk = async (data: Perk) => {
-    try {
-      const response = await fetch(`/api/admin/perks/${data.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al actualizar el perk');
-      }
-
-      const updatedPerk = await response.json();
-      setPerks(perks.map(perk => 
-        perk.id === updatedPerk.id ? updatedPerk : perk
-      ));
-      setSelectedPerk(null);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Error desconocido');
-    }
-  };
-
-  const handleDeletePerk = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar este perk?')) {
+  const handleDelete = async (id: string) => {
+    if (!confirm('¿Estás seguro de que quieres eliminar este perk?')) {
       return;
     }
 
@@ -154,10 +78,10 @@ export default function PerksPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Error al eliminar el perk');
+        throw new Error('Error al eliminar perk');
       }
 
-      setPerks(perks.filter(perk => perk.id !== id));
+      setPerks(perks.filter((perk) => perk.id !== id));
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Error desconocido');
     }
@@ -171,43 +95,17 @@ export default function PerksPage() {
     );
   }
 
-  if (session.user.role !== 'admin') {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Card className="p-6">
-          <div className="text-center">
-            <h2 className="text-xl font-semibold">Acceso Denegado</h2>
-            <p className="mt-2 text-gray-600">
-              No tienes permisos para acceder a esta página
-            </p>
-            <Button
-              onClick={() => router.push('/dashboard')}
-              className="mt-6"
-              variant="outline"
-            >
-              Volver al Dashboard
-            </Button>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Gestión de Perks</h1>
-        <p className="mt-2 text-gray-600">
-          Administra los perks y beneficios disponibles
-        </p>
-      </div>
-
-      <div className="mb-6">
-        <Button
-          onClick={() => setShowCreateForm(true)}
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Perks</h1>
+          <p className="mt-2 text-gray-600">
+            Gestiona los beneficios disponibles
+          </p>
+        </div>
+        <Button onClick={() => setShowForm(true)}>
+          <Plus className="mr-2 h-4 w-4" />
           Nuevo Perk
         </Button>
       </div>
@@ -218,30 +116,18 @@ export default function PerksPage() {
         </Card>
       )}
 
-      <Modal
-        isOpen={showCreateForm}
-        onClose={() => setShowCreateForm(false)}
-        title="Crear Nuevo Perk"
-      >
-        <PerkForm
-          onSubmit={handleCreatePerk}
-          onCancel={() => setShowCreateForm(false)}
-        />
-      </Modal>
-
-      <Modal
-        isOpen={selectedPerk !== null}
-        onClose={() => setSelectedPerk(null)}
-        title="Editar Perk"
-      >
-        {selectedPerk && (
+      {showForm && (
+        <Card className="mb-6 p-6">
           <PerkForm
-            initialData={selectedPerk}
-            onSubmit={handleEditPerk}
-            onCancel={() => setSelectedPerk(null)}
+            initialPerk={editingPerk}
+            onSubmit={handleSubmit}
+            onCancel={() => {
+              setShowForm(false);
+              setEditingPerk(null);
+            }}
           />
-        )}
-      </Modal>
+        </Card>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {loading ? (
@@ -266,22 +152,25 @@ export default function PerksPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-500">
-                    {perk._count.users} usuarios
+                    {perk._count?.users || 0} usuarios
                   </span>
                   <div className="space-x-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setSelectedPerk(perk)}
+                      onClick={() => {
+                        setEditingPerk(perk);
+                        setShowForm(true);
+                      }}
                     >
-                      Editar
+                      <Pencil className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="destructive"
                       size="sm"
-                      onClick={() => handleDeletePerk(perk.id)}
+                      onClick={() => handleDelete(perk.id)}
                     >
-                      Eliminar
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>

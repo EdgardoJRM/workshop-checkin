@@ -1,59 +1,46 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verify } from 'jsonwebtoken';
-import { db } from '@/lib/awsConfig';
-import { QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { db } from '@/lib/db';
 
 export async function GET() {
   try {
-    // Obtener token de las cookies de forma asíncrona
-    const cookieStore = cookies();
-    const token = await cookieStore.get('next-auth.session-token');
-
-    if (!token) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
       return NextResponse.json(
         { error: 'No autorizado' },
-        { status: 401 }
+        { status: 403 }
       );
     }
 
-    // Verificar token usando el secreto correcto
-    const payload = verify(token.value, process.env.NEXTAUTH_SECRET || '') as {
-      email: string;
-    };
-
-    // Obtener datos del usuario
-    const queryParams = new QueryCommand({
-      TableName: process.env.USER_TABLE || 'Usuarios',
-      KeyConditionExpression: 'email = :email',
-      ExpressionAttributeValues: {
-        ':email': payload.email,
-      },
-      Limit: 1,
+    const user = await db.user.findUnique({
+      where: { id: session.user.id }
     });
 
-    const result = await db.send(queryParams);
-
-    if (!result.Items || result.Items.length === 0) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Usuario no encontrado' },
         { status: 404 }
       );
     }
 
-    const user = result.Items[0];
+    // Eliminar el password del objeto de respuesta
+    const userResponse = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      perks: user.perks,
+      eventAccess: user.eventAccess,
+      isActive: user.isActive,
+      type: user.type
+    };
 
-    // Remove sensitive fields without creating unused variables
-    const { password: _, ...safeUser } = user;
-
-    return NextResponse.json({
-      success: true,
-      user: safeUser,
-    });
+    return NextResponse.json(userResponse);
   } catch (error) {
     console.error('Error al obtener perfil:', error);
     return NextResponse.json(
-      { error: 'Error al obtener información de perfil' },
+      { error: 'Error al obtener el perfil' },
       { status: 500 }
     );
   }

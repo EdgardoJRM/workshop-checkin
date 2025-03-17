@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,56 +14,61 @@ interface Event {
   description: string;
   date: string;
   location: string;
-  capacity: number;
+  capacity: number | null;
 }
 
 interface EventFormProps {
-  event?: Event | null;
-  onSubmit: (data: any) => void;
+  initialEvent?: Event;
+  onSubmit: (event: Event) => Promise<void>;
   onCancel: () => void;
 }
 
-export default function EventForm({ event, onSubmit, onCancel }: EventFormProps) {
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    date: '',
-    location: '',
-    capacity: ''
-  });
+export default function EventForm({ initialEvent, onSubmit, onCancel }: EventFormProps) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (event) {
-      const date = new Date(event.date);
-      const formattedDate = date.toISOString().slice(0, 16); // Format: "YYYY-MM-DDThh:mm"
-      
-      setFormData({
-        name: event.name,
-        description: event.description || '',
-        date: formattedDate,
-        location: event.location,
-        capacity: event.capacity.toString()
-      });
-    }
-  }, [event]);
+  const [name, setName] = useState(initialEvent?.name || '');
+  const [description, setDescription] = useState(initialEvent?.description || '');
+  const [date, setDate] = useState(initialEvent?.date || '');
+  const [location, setLocation] = useState(initialEvent?.location || '');
+  const [capacity, setCapacity] = useState<number | null>(initialEvent?.capacity || null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({
-      ...formData,
-      capacity: parseInt(formData.capacity),
-      ...(event && { id: event.id })
-    });
+    setSaving(true);
+    setError('');
+
+    try {
+      await onSubmit({
+        id: initialEvent?.id || '',
+        name,
+        description,
+        date,
+        location,
+        capacity
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al guardar el evento');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="bg-red-50 p-4 rounded-lg text-red-600 mb-4">
+          {error}
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="name">Nombre del Evento</Label>
         <Input
           id="name"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           placeholder="Ej: Taller de Desarrollo Web"
           className="w-full"
           required
@@ -73,8 +79,8 @@ export default function EventForm({ event, onSubmit, onCancel }: EventFormProps)
         <Label htmlFor="description">Descripción</Label>
         <Textarea
           id="description"
-          value={formData.description}
-          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
           placeholder="Describe el evento y sus objetivos..."
           className="min-h-[100px] w-full"
           rows={4}
@@ -90,8 +96,8 @@ export default function EventForm({ event, onSubmit, onCancel }: EventFormProps)
           <Input
             id="date"
             type="datetime-local"
-            value={formData.date}
-            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
             className="w-full"
             required
           />
@@ -105,8 +111,8 @@ export default function EventForm({ event, onSubmit, onCancel }: EventFormProps)
           <Input
             id="capacity"
             type="number"
-            value={formData.capacity}
-            onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+            value={capacity || ''}
+            onChange={(e) => setCapacity(e.target.value ? parseInt(e.target.value) : null)}
             placeholder="Ej: 30"
             className="w-full"
             min="1"
@@ -122,8 +128,8 @@ export default function EventForm({ event, onSubmit, onCancel }: EventFormProps)
         </Label>
         <Input
           id="location"
-          value={formData.location}
-          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
           placeholder="Ej: Sala de Conferencias A"
           className="w-full"
           required
@@ -138,8 +144,11 @@ export default function EventForm({ event, onSubmit, onCancel }: EventFormProps)
         >
           Cancelar
         </Button>
-        <Button type="submit">
-          {event ? 'Actualizar' : 'Crear'} Evento
+        <Button
+          type="submit"
+          disabled={saving}
+        >
+          {saving ? 'Guardando...' : 'Guardar'}
         </Button>
       </div>
     </form>

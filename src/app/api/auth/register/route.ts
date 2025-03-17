@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
+import { hash } from 'bcryptjs';
 import { db } from '@/lib/db';
 
 // Función auxiliar para validar email
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     // Validar datos requeridos
     if (!email || !password || !name) {
       return NextResponse.json(
-        { error: 'Todos los campos son requeridos' },
+        { error: 'Missing required fields' },
         { status: 400 }
       );
     }
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
 
     if (existingUser) {
       return NextResponse.json(
-        { error: 'El email ya está registrado' },
+        { error: 'Email already registered' },
         { status: 400 }
       );
     }
@@ -49,29 +49,32 @@ export async function POST(request: Request) {
     }
 
     // Hash de la contraseña
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await hash(password, 10);
 
     // Crear usuario
     const user = await db.user.create({
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       email,
-      password: hashedPassword,
       name,
+      password: hashedPassword,
       role: 'user',
       perks: [],
       eventAccess: [],
-      isActive: true,
+      isActive: false,
       type: 'user'
     });
 
-    // Eliminar el password del objeto de respuesta
-    const { password: _, ...userWithoutPassword } = user;
-
-    return NextResponse.json(userWithoutPassword);
+    return NextResponse.json({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      isActive: user.isActive
+    });
   } catch (error) {
-    console.error('Error al registrar usuario:', error);
+    console.error('Error registering user:', error);
     return NextResponse.json(
-      { error: 'Error al registrar el usuario' },
+      { error: 'Error registering user' },
       { status: 500 }
     );
   }

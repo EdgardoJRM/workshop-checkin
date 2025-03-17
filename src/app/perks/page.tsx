@@ -1,135 +1,113 @@
 'use client';
 
+import { useSession } from 'next-auth/react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import ProtectedContent from '@/components/shared/ProtectedContent';
-import type { Perk } from '@/lib/db';
+import type { Content } from '@/lib/db';
 
-export default function UserPerksPage() {
-  const router = useRouter();
+interface Perk {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  contents: Content[];
+}
+
+export default function PerksPage() {
+  const { data: session, status } = useSession();
   const [perks, setPerks] = useState<Perk[]>([]);
-  const [selectedContent, setSelectedContent] = useState<{
-    url: string;
-    type: 'pdf' | 'ebook' | 'calculator';
-    title: string;
-  } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (status === 'unauthenticated') {
+      window.location.href = '/login';
+      return;
+    }
+
     const fetchPerks = async () => {
       try {
-        const response = await fetch('/api/user/perks');
-        if (!response.ok) throw new Error('Error al cargar perks');
+        const response = await fetch('/api/perks');
+        if (!response.ok) {
+          throw new Error('Error al cargar perks');
+        }
         const data = await response.json();
         setPerks(data);
       } catch (error) {
-        console.error('Error:', error);
+        setError(error instanceof Error ? error.message : 'Error desconocido');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPerks();
-  }, []);
+    if (session?.user) {
+      fetchPerks();
+    }
+  }, [session, status]);
 
-  if (loading) {
+  if (status === 'loading' || !session) {
     return (
-      <div className="min-h-screen flex items-center justify-center dark-theme">
-        <p>Cargando tus materiales...</p>
-      </div>
-    );
-  }
-
-  if (selectedContent) {
-    return (
-      <div className="min-h-screen dark-theme">
-        <div className="container mx-auto py-8">
-          <button
-            onClick={() => setSelectedContent(null)}
-            className="mb-6 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            ← Volver a mis materiales
-          </button>
-          
-          <ProtectedContent {...selectedContent} />
-        </div>
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="animate-pulse text-lg">Cargando...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen dark-theme">
-      <div className="container mx-auto py-8 px-4">
-        <h1 className="text-3xl font-bold mb-8">Mis Materiales</h1>
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Mis Perks</h1>
+        <p className="mt-2 text-gray-600">
+          Accede a tus beneficios exclusivos
+        </p>
+      </div>
 
-        {perks.length === 0 ? (
-          <div className="text-center py-10">
-            <p className="text-gray-400 mb-4">Aún no tienes acceso a ningún material.</p>
-            <p className="text-gray-500">
-              Contacta con el administrador si crees que esto es un error.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {perks.map((perk) => (
-              <div key={perk.id} className="bg-gray-800 rounded-lg shadow-lg p-6">
-                <h2 className="text-xl font-semibold mb-4">{perk.name}</h2>
-                <p className="text-gray-400 mb-4">{perk.description}</p>
-                
-                <div className="space-y-4">
-                  {perk.contents.map((content, index) => (
-                    <div 
-                      key={index}
-                      className="p-4 border border-gray-700 rounded-lg hover:bg-gray-700 transition-colors cursor-pointer"
-                      onClick={() => {
-                        if (content.accessUrl) {
-                          window.open(content.accessUrl, '_blank');
-                        } else {
-                          setSelectedContent({
-                            url: content.url,
-                            type: content.type as any,
-                            title: content.name
-                          });
-                        }
-                      }}
-                    >
-                      <div className="flex items-center">
-                        {/* Icono según el tipo de contenido */}
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center mr-3">
-                          {content.type === 'ebook' && '📚'}
-                          {content.type === 'calculator' && '🧮'}
-                          {content.type === 'certificate' && '🎓'}
-                          {content.type === 'course' && '📺'}
-                          {content.type === 'tool' && '🛠️'}
-                        </div>
-                        <div>
-                          <h3 className="font-medium">{content.name}</h3>
-                          <p className="text-sm text-gray-400">
-                            {content.accessUrl ? 'Abrir en nueva ventana' : 'Ver contenido'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+      {error && (
+        <Card className="mb-6 p-4">
+          <p className="text-center text-red-600">{error}</p>
+        </Card>
+      )}
 
-                {/* Si el perk incluye acceso a eventos, mostrar información */}
-                {perk.eventAccess && perk.eventAccess.length > 0 && (
-                  <div className="mt-6">
-                    <h3 className="text-lg font-semibold mb-2">Eventos Incluidos</h3>
-                    {perk.eventAccess.map((event) => (
-                      <div key={event.eventId} className="p-3 bg-gray-700 rounded-lg mb-2">
-                        <p className="font-medium">{event.eventName}</p>
-                        <p className="text-sm text-gray-400">
-                          {new Date(event.date).toLocaleDateString()}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {loading ? (
+          [...Array(3)].map((_, i) => (
+            <Card key={i} className="p-6">
+              <div className="space-y-4">
+                <div className="h-6 w-2/3 animate-pulse rounded bg-gray-200" />
+                <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
+                <div className="h-4 w-1/2 animate-pulse rounded bg-gray-200" />
               </div>
-            ))}
-          </div>
+            </Card>
+          ))
+        ) : perks.length > 0 ? (
+          perks.map((perk) => (
+            <Card key={perk.id} className="p-6">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold">{perk.name}</h3>
+                  <p className="mt-1 text-sm text-gray-600">
+                    {perk.description}
+                  </p>
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.location.href = `/perks/${perk.id}`}
+                  >
+                    Ver Contenido
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))
+        ) : (
+          <Card className="col-span-full p-6">
+            <p className="text-center text-gray-600">
+              No tienes perks disponibles
+            </p>
+          </Card>
         )}
       </div>
     </div>

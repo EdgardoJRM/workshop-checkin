@@ -1,67 +1,66 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { verify } from '@/lib/jwt';
-import { db } from '@/lib/db';
-import { TOKEN_COOKIE_NAME } from '@/lib/cookies';
+import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { db } from '@/lib/db';
 
 // Obtener un usuario específico
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
-  try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.role || session.user.role !== 'admin') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
+  const session = await getServerSession(authOptions);
 
+  if (!session?.user || session.user.role !== 'admin') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+  }
+
+  try {
     const user = await db.user.findUnique({
       where: { id: params.id }
     });
 
     if (!user) {
       return NextResponse.json(
-        { error: 'Usuario no encontrado' },
+        { error: 'User not found' },
         { status: 404 }
       );
     }
 
-    // Omitir información sensible
-    const { password, ...userWithoutPassword } = user;
-    return NextResponse.json(userWithoutPassword);
+    return NextResponse.json(user);
   } catch (error) {
-    console.error('Error al obtener usuario:', error);
+    console.error('Error fetching user:', error);
     return NextResponse.json(
-      { error: 'Error al obtener el usuario' },
+      { error: 'Error fetching user' },
       { status: 500 }
     );
   }
 }
 
 // Actualizar un usuario
-export async function PUT(
+export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
     if (!session?.user?.role || session.user.role !== 'admin') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 403 }
+      );
     }
 
-    const data = await request.json();
+    const body = await request.json();
+    const { name, role, perks, eventAccess, isActive } = body;
 
-    // Actualizar el usuario
     const updatedUser = await db.user.update({
       where: { id: params.id },
       data: {
-        name: data.name,
-        role: data.role,
-        isActive: data.isActive
+        name,
+        role,
+        perks,
+        eventAccess,
+        isActive
       }
     });
 
@@ -72,9 +71,19 @@ export async function PUT(
       );
     }
 
-    // Omitir información sensible
-    const { password, ...userWithoutPassword } = updatedUser;
-    return NextResponse.json(userWithoutPassword);
+    // Eliminar el password del objeto de respuesta
+    const userResponse = {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      name: updatedUser.name,
+      role: updatedUser.role,
+      perks: updatedUser.perks,
+      eventAccess: updatedUser.eventAccess,
+      isActive: updatedUser.isActive,
+      type: updatedUser.type
+    };
+
+    return NextResponse.json(userResponse);
   } catch (error) {
     console.error('Error al actualizar usuario:', error);
     return NextResponse.json(
@@ -91,22 +100,16 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
     if (!session?.user?.role || session.user.role !== 'admin') {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    // Eliminar el usuario
-    const deletedUser = await db.user.delete({
-      where: { id: params.id }
-    });
-
-    if (!deletedUser) {
       return NextResponse.json(
-        { error: 'Usuario no encontrado' },
-        { status: 404 }
+        { error: 'No autorizado' },
+        { status: 403 }
       );
     }
+
+    await db.user.delete({
+      where: { id: params.id }
+    });
 
     return NextResponse.json({ message: 'Usuario eliminado correctamente' });
   } catch (error) {

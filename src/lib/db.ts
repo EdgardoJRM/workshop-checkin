@@ -1,5 +1,6 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, DeleteCommand, UpdateCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { v4 as uuidv4 } from 'uuid';
 
 // Configurar el cliente de DynamoDB
 const client = new DynamoDBClient({
@@ -71,7 +72,7 @@ export interface User {
   capacity?: number | null;
   description?: string;
   price?: number;
-  contents?: any[];
+  contents?: Content[];
   userId?: string;
   eventId?: string;
   eventName?: string;
@@ -79,15 +80,20 @@ export interface User {
   updatedAt?: Date;
 }
 
+function generateId(): string {
+  return uuidv4();
+}
+
 export interface UserCreateInput {
   id: string;
   email: string;
   name: string;
   password: string;
-  role: 'admin' | 'staff' | 'user';
-  perks: string[];
-  eventAccess: string[];
-  isActive: boolean;
+  role?: 'admin' | 'staff' | 'user';
+  perks?: string[];
+  eventAccess?: string[];
+  isActive?: boolean;
+  type?: 'user' | 'event' | 'perk' | 'access_log';
 }
 
 export interface UserUpdateInput {
@@ -130,8 +136,20 @@ export interface UserModel {
   delete(options: DeleteOptions): Promise<User | null>;
 }
 
+export interface PerkModel {
+  create(perkData: Omit<Perk, 'id' | 'createdAt' | 'updatedAt'>): Promise<Perk>;
+  findUnique(options: { where: { id: string } }): Promise<Perk | null>;
+  findMany(options?: { 
+    where?: { type?: string };
+    orderBy?: Record<string, 'asc' | 'desc'>;
+  }): Promise<Perk[]>;
+  update(options: { where: { id: string }; data: Partial<Perk> }): Promise<Perk | null>;
+  delete(options: { where: { id: string } }): Promise<Perk | null>;
+}
+
 export interface DB {
   user: UserModel;
+  perk: PerkModel;
 }
 
 const userModel: UserModel = {
@@ -228,8 +246,116 @@ const userModel: UserModel = {
   }
 };
 
+const perkModel: PerkModel = {
+  async create(perkData: Omit<Perk, 'id' | 'createdAt' | 'updatedAt'>): Promise<Perk> {
+    const id = generateId();
+    const now = new Date().toISOString();
+    const perk: Perk = {
+      ...perkData,
+      id,
+      createdAt: new Date(now),
+      updatedAt: new Date(now)
+    };
+
+    const command = new PutCommand({
+      TableName: TABLE_NAME,
+      Item: perk
+    });
+
+    await docClient.send(command);
+    return perk;
+  },
+
+  async findUnique(options: { where: { id: string } }): Promise<Perk | null> {
+    const command = new GetCommand({
+      TableName: TABLE_NAME,
+      Key: { id: options.where.id }
+    });
+
+    const response = await docClient.send(command);
+    return response.Item as Perk || null;
+  },
+
+  async findMany(options?: { 
+    where?: { type?: string };
+    orderBy?: Record<string, 'asc' | 'desc'>;
+  }): Promise<Perk[]> {
+    const command = new ScanCommand({
+      TableName: TABLE_NAME
+    });
+
+    const response = await docClient.send(command);
+    let perks = response.Items as Perk[];
+
+    if (options?.where?.type) {
+      perks = perks.filter(perk => perk.type === options.where?.type);
+    }
+
+    if (options?.orderBy) {
+      const [field, direction] = Object.entries(options.orderBy)[0];
+      perks.sort((a, b) => {
+        const aValue = a[field as keyof Perk];
+        const bValue = b[field as keyof Perk];
+        
+        if (!aValue || !bValue) return 0;
+        
+        if (direction === 'asc') {
+          return aValue > bValue ? 1 : -1;
+        }
+        return aValue < bValue ? 1 : -1;
+      });
+    }
+
+    return perks;
+  },
+
+  async update(options: { where: { id: string }; data: Partial<Perk> }): Promise<Perk | null> {
+    const updateExpression: string[] = [];
+    const expressionAttributeNames: Record<string, string> = {};
+    const expressionAttributeValues: Record<string, unknown> = {};
+
+    Object.entries(options.data).forEach(([key, value]) => {
+      if (value !== undefined) {
+        updateExpression.push(`#${key} = :${key}`);
+        expressionAttributeNames[`#${key}`] = key;
+        expressionAttributeValues[`:${key}`] = value;
+      }
+    });
+
+    if (updateExpression.length === 0) return null;
+
+    updateExpression.push('#updatedAt = :updatedAt');
+    expressionAttributeNames['#updatedAt'] = 'updatedAt';
+    expressionAttributeValues[':updatedAt'] = new Date().toISOString();
+
+    const command = new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { id: options.where.id },
+      UpdateExpression: `SET ${updateExpression.join(', ')}`,
+      ExpressionAttributeNames: expressionAttributeNames,
+      ExpressionAttributeValues: expressionAttributeValues,
+      ReturnValues: 'ALL_NEW'
+    });
+
+    const response = await docClient.send(command);
+    return response.Attributes as Perk;
+  },
+
+  async delete(options: { where: { id: string } }): Promise<Perk | null> {
+    const command = new DeleteCommand({
+      TableName: TABLE_NAME,
+      Key: { id: options.where.id },
+      ReturnValues: 'ALL_OLD'
+    });
+
+    const response = await docClient.send(command);
+    return response.Attributes as Perk;
+  }
+};
+
 export const db: DB = {
-  user: userModel
+  user: userModel,
+  perk: perkModel
 };
 
 // Función para crear datos de prueba
@@ -299,4 +425,11 @@ export const createMockData = async () => {
     console.error('Error al crear datos de prueba:', error);
     throw error;
   }
-}; 
+};
+
+export async function createUser(data: Omit<UserCreateInput, 'id'>): Promise<User> {
+  const id = generateId();
+  const user = { ...data, id } as UserCreateInput;
+  await db.user.create(user);
+  return user as User;
+} 

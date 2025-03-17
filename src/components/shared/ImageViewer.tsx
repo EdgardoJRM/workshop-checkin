@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 
 interface ImageViewerProps {
   images: string[];
@@ -157,13 +158,15 @@ export default function ImageViewer({ images, title }: ImageViewerProps) {
               }}
             >
               {/* Imagen actual */}
-              <img
+              <Image
                 src={images[currentIndex]}
                 alt={`${title || 'Documento'} - Página ${currentIndex + 1}`}
+                fill
                 className="max-h-[70vh] w-auto object-contain"
                 style={{ 
                   pointerEvents: 'none',  // Más protección contra descargas
                 }}
+                priority
               />
               
               {/* Marca de agua dinámica con el email del usuario */}
