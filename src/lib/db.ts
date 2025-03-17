@@ -58,15 +58,22 @@ export interface UserPerk {
 
 export interface User {
   id: string;
-  email: string;
+  email?: string;
   name: string;
-  password: string;
-  role: 'admin' | 'staff' | 'user';
-  perks: string[];
-  eventAccess: string[];
-  isActive: boolean;
+  password?: string;
+  role?: 'admin' | 'staff' | 'user';
+  perks?: string[];
+  eventAccess?: string[];
+  isActive?: boolean;
+  type?: 'user' | 'event' | 'perk';
+  date?: string;
+  location?: string;
+  capacity?: number | null;
+  description?: string;
+  price?: number;
+  contents?: any[];
   createdAt: Date;
-  updatedAt: Date;
+  updatedAt?: Date;
 }
 
 export interface UserCreateInput {

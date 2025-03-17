@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { db } from '@/lib/db';
 
 // Simulated perks data since we don't have a Perk model yet
 const perks = [
@@ -36,37 +37,69 @@ const perks = [
 
 // GET /api/admin/perks - Obtener todos los perks
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  
-  if (!session?.user || session.user.role !== 'admin') {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.role || session.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 403 }
+      );
+    }
 
-  return NextResponse.json(perks);
+    // Obtener perks usando DynamoDB
+    const allItems = await db.user.findMany();
+    const perks = allItems.filter(item => item.type === 'perk');
+
+    return NextResponse.json(perks);
+  } catch (error) {
+    console.error('Error al obtener perks:', error);
+    return NextResponse.json(
+      { error: 'Error al obtener perks' },
+      { status: 500 }
+    );
+  }
 }
 
 // POST /api/admin/perks - Crear un nuevo perk
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  
-  if (!session?.user || session.user.role !== 'admin') {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
   try {
-    const data = await request.json();
-    const newPerk = {
-      id: String(perks.length + 1),
-      name: data.name,
-      description: data.description,
-      type: data.type,
-      _count: { users: 0 }
-    };
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.role || session.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'No autorizado' },
+        { status: 403 }
+      );
+    }
 
-    perks.push(newPerk);
-    return NextResponse.json(newPerk);
+    const body = await request.json();
+    const { name, description, type, price } = body;
+
+    // Validar datos requeridos
+    if (!name || !type || price === undefined) {
+      return NextResponse.json(
+        { error: 'Nombre, tipo y precio son requeridos' },
+        { status: 400 }
+      );
+    }
+
+    // Crear perk usando DynamoDB
+    const perk = await db.user.create({
+      id: Date.now().toString(),
+      name,
+      description,
+      type,
+      price,
+      contents: [],
+      type: 'perk'
+    });
+
+    return NextResponse.json(perk);
   } catch (error) {
-    return new NextResponse('Error creating perk', { status: 500 });
+    console.error('Error al crear perk:', error);
+    return NextResponse.json(
+      { error: 'Error al crear el perk' },
+      { status: 500 }
+    );
   }
 }
 

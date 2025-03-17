@@ -49,30 +49,21 @@ function jsonResponse<T>(data: ApiResponse<T>, status = 200) {
 
 export async function GET() {
   try {
-    console.log('Iniciando obtención de usuarios...');
-    
-    // Verificar sesión
     const session = await getServerSession(authOptions);
-    
     if (!session?.user?.role || session.user.role !== 'admin') {
-      console.log('Usuario no autorizado:', session?.user);
-      return jsonResponse<never>(
+      return NextResponse.json(
         { error: 'No autorizado' },
-        401
+        { status: 403 }
       );
     }
 
-    // Obtener usuarios
-    const users = await db.user.findMany();
+    // Obtener usuarios usando DynamoDB
+    const allItems = await db.user.findMany();
+    const users = allItems
+      .filter(item => item.type === 'user' || !item.type) // Incluir usuarios sin tipo por compatibilidad
+      .map(({ password, ...user }) => user); // Excluir contraseñas
 
-    // Formatear usuarios para omitir información sensible
-    const formattedUsers = users.map(user => {
-      const { password, ...userWithoutPassword } = user;
-      return userWithoutPassword;
-    });
-
-    // Retornar directamente el array de usuarios
-    return NextResponse.json(formattedUsers);
+    return NextResponse.json(users);
   } catch (error) {
     console.error('Error al obtener usuarios:', error);
     return NextResponse.json(

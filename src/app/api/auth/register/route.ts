@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
-import { prisma } from '@/lib/db';
+import { db } from '@/lib/db';
 
 // Función auxiliar para validar email
 function validateEmail(email: string): boolean {
@@ -11,24 +10,24 @@ function validateEmail(email: string): boolean {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { name, email, password } = body;
+    const { email, password, name } = await request.json();
 
-    // Verificar datos obligatorios
-    if (!name || !email || !password) {
+    // Validar datos requeridos
+    if (!email || !password || !name) {
       return NextResponse.json(
-        { error: 'Todos los campos son obligatorios' },
+        { error: 'Todos los campos son requeridos' },
         { status: 400 }
       );
     }
 
-    // Verificar si el email ya existe
-    const existingUser = await prisma.user.findUnique({
+    // Verificar si el usuario ya existe
+    const existingUser = await db.user.findUnique({
       where: { email }
     });
+
     if (existingUser) {
       return NextResponse.json(
-        { error: 'Email ya registrado' },
+        { error: 'El email ya está registrado' },
         { status: 400 }
       );
     }
@@ -49,35 +48,30 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generar hash de la contraseña
+    // Hash de la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Crear usuario con rol 'user' por defecto y forzar el rol a 'user'
-    const newUser = await prisma.user.create({
-      data: {
-        id: uuidv4(),
-        name,
-        email,
-        password: hashedPassword,
-        role: 'user', // Forzar el rol a 'user' sin importar lo que se envíe
-        isActive: false, // Los usuarios nuevos necesitan aprobación
-      }
+    // Crear usuario
+    const user = await db.user.create({
+      id: Date.now().toString(),
+      email,
+      password: hashedPassword,
+      name,
+      role: 'user',
+      perks: [],
+      eventAccess: [],
+      isActive: true,
+      type: 'user'
     });
 
-    // Retornar respuesta exitosa
-    return NextResponse.json({
-      message: 'Registro exitoso. Tu cuenta será revisada por un administrador.',
-      user: {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
-      },
-    });
+    // Eliminar el password del objeto de respuesta
+    const { password: _, ...userWithoutPassword } = user;
+
+    return NextResponse.json(userWithoutPassword);
   } catch (error) {
-    console.error('Error en registro:', error);
+    console.error('Error al registrar usuario:', error);
     return NextResponse.json(
-      { error: 'Error al procesar la solicitud' },
+      { error: 'Error al registrar el usuario' },
       { status: 500 }
     );
   }

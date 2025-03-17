@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { db } from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
@@ -25,15 +25,15 @@ export async function POST(request: Request) {
       );
     }
 
-    // Crear evento
-    const event = await prisma.event.create({
-      data: {
-        name,
-        description,
-        date: new Date(date),
-        location,
-        capacity: capacity || null,
-      }
+    // Crear evento usando DynamoDB
+    const event = await db.user.create({
+      id: Date.now().toString(), // Generar un ID único
+      name,
+      description,
+      date: new Date(date).toISOString(),
+      location,
+      capacity: capacity || null,
+      type: 'event' // Agregar un discriminador para diferenciar eventos de usuarios
     });
 
     return NextResponse.json(event);
@@ -56,11 +56,10 @@ export async function GET() {
       );
     }
 
-    const events = await prisma.event.findMany({
-      orderBy: {
-        date: 'desc'
-      }
-    });
+    // Obtener eventos usando DynamoDB
+    const allItems = await db.user.findMany();
+    const events = allItems.filter(item => item.type === 'event')
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return NextResponse.json(events);
   } catch (error) {
