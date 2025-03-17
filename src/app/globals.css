@@ -1,0 +1,255 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 25% 97%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 220 25% 97%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 220 25% 97%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+
+  * {
+    @apply border-border;
+  }
+}
+
+@layer components {
+  .container {
+    @apply mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl;
+  }
+
+  .card {
+    @apply bg-card text-card-foreground rounded-lg border shadow-sm;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 
+           font-semibold py-2 px-4 rounded-lg transition-all duration-200 
+           ease-in-out shadow-sm hover:shadow-md disabled:opacity-50 
+           disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80 
+           font-semibold py-2 px-4 rounded-lg transition-all duration-200 
+           ease-in-out shadow-sm hover:shadow-md disabled:opacity-50 
+           disabled:cursor-not-allowed;
+  }
+
+  .input {
+    @apply bg-background border border-input text-foreground rounded-lg px-4 py-2
+           focus:ring-2 focus:ring-ring focus:border-transparent outline-none
+           placeholder:text-muted-foreground disabled:opacity-50 
+           disabled:cursor-not-allowed;
+  }
+
+  .hover-effect {
+    @apply hover:scale-105 transition-transform duration-200 ease-in-out;
+  }
+
+  .gradient-border {
+    @apply border border-transparent bg-gradient-to-r from-primary to-primary/80 
+           rounded-lg p-[1px];
+  }
+
+  .gradient-border > * {
+    @apply bg-background rounded-lg;
+  }
+
+  .table-container {
+    @apply w-full overflow-x-auto rounded-lg border;
+  }
+
+  table {
+    @apply w-full border-collapse;
+  }
+
+  th {
+    @apply bg-muted text-muted-foreground font-semibold p-3 text-left;
+  }
+
+  td {
+    @apply border-b border-border p-3;
+  }
+
+  tr:hover {
+    @apply bg-muted/50;
+  }
+}
+
+.gradient-bg {
+  background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--muted)) 100%);
+}
+
+.glass-card {
+  @apply bg-background/80 backdrop-blur-lg border border-border/50 shadow-lg;
+}
+
+.hover-card {
+  @apply transition-all duration-200 ease-in-out;
+}
+
+.hover-card:hover {
+  @apply -translate-y-0.5 shadow-lg;
+}
+
+/* Scrollbar Styles */
+::-webkit-scrollbar {
+  @apply w-2 h-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-muted rounded-full;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/50 rounded-full hover:bg-muted-foreground/70;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Custom Button Styles */
+.btn-gradient {
+  @apply bg-gradient-to-r from-primary to-primary/80 text-primary-foreground
+         transition-all duration-300 ease-in-out;
+}
+
+.btn-gradient:hover {
+  @apply bg-gradient-to-r from-primary/90 to-primary/70 -translate-y-0.5 shadow-md;
+}
+
+@layer utilities {
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+  .animation-delay-4000 {
+    animation-delay: 4s;
+  }
+}
+
+@keyframes blob {
+  0% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+}
+
+.animate-blob {
+  animation: blob 7s infinite;
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .container {
+    @apply px-4;
+  }
+  
+  .card {
+    @apply rounded-lg;
+  }
+  
+  .btn-primary, .btn-secondary {
+    @apply w-full;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .container {
+    @apply px-6;
+  }
+}
+
+@media (min-width: 1025px) {
+  .container {
+    @apply px-8;
+  }
+}

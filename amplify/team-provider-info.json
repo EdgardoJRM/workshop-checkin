@@ -1,0 +1,20 @@
+{
+  "dev": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-wcheckin-dev-c80e7-authRole",
+      "UnauthRoleArn": "arn:aws:iam::585735157371:role/amplify-wcheckin-dev-c80e7-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::585735157371:role/amplify-wcheckin-dev-c80e7-authRole",
+      "Region": "us-east-1",
+      "DeploymentBucketName": "amplify-wcheckin-dev-c80e7-deployment",
+      "UnauthRoleName": "amplify-wcheckin-dev-c80e7-unauthRole",
+      "StackName": "amplify-wcheckin-dev-c80e7",
+      "StackId": "arn:aws:cloudformation:us-east-1:585735157371:stack/amplify-wcheckin-dev-c80e7/a0f4ed10-00fc-11f0-943e-0afff695f19b",
+      "AmplifyAppId": "d3p665ai58oixl"
+    },
+    "categories": {
+      "auth": {
+        "wcheckinbf1a7d2a": {}
+      }
+    }
+  }
+}
